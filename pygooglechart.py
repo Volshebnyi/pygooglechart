@@ -25,22 +25,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # unnecessary on Python3, but harmless
 from __future__ import division
 
-import os
-import math
-import random
 import re
 import warnings
-import copy
 
 try:
     # we're on Python3
-    from urllib.request import urlopen
-    from urllib.parse import quote
+    from urllib.request import urlopen as py3_urlopen
+    from urllib.parse import quote as py3_quote
 
 except ImportError:
     # we're on Python2.x
-    from urllib2 import urlopen
-    from urllib import quote
+    from urllib2 import urlopen as py2_urlopen
+    from urllib import quote as py2_quote
+    urlopen = py2_urlopen
+    quote = py2_quote
+else:
+    urlopen = py3_urlopen
+    quote = py3_quote
 
 
 # Helper variables and functions
@@ -50,6 +51,7 @@ __version__ = '0.3.0'
 __author__ = 'Gerald Kaszuba'
 
 reo_colour = re.compile('^([A-Fa-f0-9]{2,2}){3,4}$')
+
 
 def _check_colour(colour):
     if not reo_colour.match(colour):
@@ -97,6 +99,7 @@ class AbstractClassException(PyGoogleChartException):
 
 class UnknownChartType(PyGoogleChartException):
     pass
+
 
 class UnknownCountryCodeException(PyGoogleChartException):
     pass
@@ -350,10 +353,10 @@ class Chart(object):
 
     # URL generation
     # -------------------------------------------------------------------------
-        
+
     def get_url(self, data_class=None):
         return self.BASE_URL + '?' + self.get_url_extension(data_class)
-    
+
     def get_url_extension(self, data_class=None):
         url_bits = self.get_url_bits(data_class=data_class)
         return '&'.join(url_bits)
@@ -375,7 +378,7 @@ class Chart(object):
         if self.legend_position:
             url_bits.append('chdlp=%s' % (self.legend_position))
         if self.colours:
-            url_bits.append('chco=%s' % ','.join(self.colours))            
+            url_bits.append('chco=%s' % ','.join(self.colours))
         if self.colours_within_series:
             url_bits.append('chco=%s' % '%7c'.join(self.colours_within_series))
         ret = self.fill_to_url()
@@ -383,9 +386,9 @@ class Chart(object):
             url_bits.append(ret)
         ret = self.axis_to_url()
         if ret:
-            url_bits.append(ret)                    
+            url_bits.append(ret)
         if self.markers:
-            url_bits.append(self.markers_to_url())        
+            url_bits.append(self.markers_to_url())
         if self.line_styles:
             style = []
             for index in range(max(self.line_styles) + 1):
@@ -443,7 +446,7 @@ class Chart(object):
     def set_legend_position(self, legend_position):
         if legend_position:
             self.legend_position = quote(legend_position)
-        else:    
+        else:
             self.legend_position = None
 
     # Chart colours
@@ -467,7 +470,7 @@ class Chart(object):
         if colours:
             for col in colours:
                 _check_colour(col)
-        self.colours_within_series = colours        
+        self.colours_within_series = colours
 
     # Background/Chart colours
     # -------------------------------------------------------------------------
@@ -657,7 +660,7 @@ class Chart(object):
             self.axis[axis_index].set_positions(positions)
         except IndexError:
             raise InvalidParametersException('Axis index %i has not been ' \
-                'created' % axis)
+                'created' % axis_index)
 
     def set_axis_style(self, axis_index, colour, font_size=None, \
             alignment=None):
@@ -665,7 +668,7 @@ class Chart(object):
             self.axis[axis_index].set_style(colour, font_size, alignment)
         except IndexError:
             raise InvalidParametersException('Axis index %i has not been ' \
-                'created' % axis)
+                'created' % axis_index)
 
     def axis_to_url(self):
         available_axis = []
@@ -673,7 +676,6 @@ class Chart(object):
         range_axis = []
         positions = []
         styles = []
-        index = -1
         for axis in self.axis:
             available_axis.append(axis.axis_type)
             if isinstance(axis, RangeAxis):
@@ -701,7 +703,7 @@ class Chart(object):
     # Markers, Ranges and Fill area (chm)
     # -------------------------------------------------------------------------
 
-    def markers_to_url(self):        
+    def markers_to_url(self):
         return 'chm=%s' % '%7c'.join([','.join(a) for a in self.markers])
 
     def add_marker(self, index, point, marker_type, colour, size, priority=0):
@@ -718,7 +720,7 @@ class Chart(object):
     def add_marker_text(self, string, colour, data_set, data_point, size, \
             priority=0):
         self.markers.append((str(string), colour, str(data_set), \
-            str(data_point), str(size), str(priority)))        
+            str(data_point), str(size), str(priority)))
 
     def add_vertical_range(self, colour, start, stop):
         self.markers.append(('R', colour, '0', str(start), str(stop)))
@@ -1005,7 +1007,7 @@ class MapChart(Chart):
             'TO', 'TR', 'TT', 'TV', 'TW', 'TZ', 'UA', 'UG', 'UM', 'US', 'UY',
             'UZ', 'VA', 'VC', 'VE', 'VG', 'VI', 'VN', 'VU', 'WF', 'WS', 'YE',
             'YT', 'ZA', 'ZM', 'ZW')
-        
+
     def type_to_url(self):
         return 'cht=t'
 
@@ -1019,14 +1021,14 @@ class MapChart(Chart):
         '''
 
         codemap = ''
-        
+
         for cc in codes:
             cc = cc.upper()
             if cc in self.__ccodes:
                 codemap += cc
             else:
                 raise UnknownCountryCodeException(cc)
-            
+
         self.codes = codemap
 
     def set_geo_area(self, area):
@@ -1040,11 +1042,11 @@ class MapChart(Chart):
         * usa
         * world
         '''
-        
+
         if area in self.__areas:
             self.geo_area = area
         else:
-            raise UnknownChartType('Unknown chart type for maps: %s' %area)
+            raise UnknownChartType('Unknown chart type for maps: %s' % area)
 
     def get_url_bits(self, data_class=None):
         url_bits = Chart.get_url_bits(self, data_class=data_class)
@@ -1171,4 +1173,3 @@ class ChartGrammar(object):
 
     def download(self):
         pass
-
